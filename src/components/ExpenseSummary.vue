@@ -14,7 +14,7 @@
     <div class="debts">
       <div v-for="(debt, index) in store.debts" :key="index" class="debt-item">
         <div class="debt-arrow">
-            {{ debt.from }} → {{ debt.to }}
+            {{ debt.to }} → {{ debt.from }}
         </div>
         <div class="debt-amount">
           {{ debt.amount.toFixed(2) }}
@@ -49,6 +49,7 @@ const debtTotals = computed(() => {
       totals[debt.from] = 0
     }
     totals[debt.from] += debt.amount
+
   })
   
   return totals
