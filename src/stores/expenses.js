@@ -13,28 +13,52 @@ export const useExpenseStore = defineStore('expenses', () => {
   })
   
   const debts = computed(() => {
-    const debts = []
-    const avgExpense = expensePerUser.value
+    if (users.value.length === 0) return []
     
-    users.value.forEach(payer => {
-      users.value.forEach(receiver => {
-        if (payer.id !== receiver.id) {
-          const payerDiff = avgExpense - payer.total
-          const receiverDiff = receiver.total - avgExpense
-          
-          if (payerDiff > 0 && receiverDiff > 0) {
-            const debt = Math.min(payerDiff, receiverDiff)
-            if (debt > 0) {
-              debts.push({
-                from: payer.name,
-                to: receiver.name,
-                amount: debt
-              })
-            }
-          }
-        }
-      })
-    })
+    const avgExpense = expensePerUser.value
+    const debts = []
+    
+    // Step 1: Calculate difference from fair share for each person
+    // difference = paid - fair_share
+    // Positive = overpaid (should receive money)
+    // Negative = underpaid (should pay money)
+    const balances = users.value.map(user => ({
+      name: user.name,
+      difference: user.total - avgExpense  // paid - fair_share
+    }))
+    
+    // Step 2: Separate overpayers and underpayers
+    const overpayers = balances.filter(b => b.difference > 0)
+      .map(b => ({ name: b.name, amount: b.difference }))
+    const underpayers = balances.filter(b => b.difference < 0)
+      .map(b => ({ name: b.name, amount: Math.abs(b.difference) })) // Convert to positive for easier calculation
+    
+    // Step 3: Match overpayers with underpayers to settle debts
+    let overpayerIndex = 0
+    let underpayerIndex = 0
+    
+    while (overpayerIndex < overpayers.length && underpayerIndex < underpayers.length) {
+      const overpayer = overpayers[overpayerIndex]
+      const underpayer = underpayers[underpayerIndex]
+      
+      const settlement = Math.min(overpayer.amount, underpayer.amount)
+      
+      if (settlement > 0.01) { // Only add debts above 1 cent to avoid floating point issues
+        debts.push({
+          from: underpayer.name,  // Who owes money
+          to: overpayer.name,     // Who should receive money
+          amount: settlement
+        })
+      }
+      
+      // Reduce the amounts
+      overpayer.amount -= settlement
+      underpayer.amount -= settlement
+      
+      // Move to next person if their balance is settled
+      if (overpayer.amount < 0.01) overpayerIndex++
+      if (underpayer.amount < 0.01) underpayerIndex++
+    }
     
     return debts
   })
